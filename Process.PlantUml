@@ -1,0 +1,66 @@
+@startuml Payment Processing
+title SAP Treasury - Payment Processing
+
+start
+
+partition "Business User" {
+    :Заявка на платеж 
+    (Create Payment Request);
+}
+
+partition "Treasury Specialist" {
+    :Validate Payment Request;
+
+    if (Request valid?) then (Yes)
+        :Submit for Approval;
+    else (No)
+        :Reject Request;
+        stop
+    endif
+}
+
+partition "Treasury Manager" {
+    :Review Payment Request;
+
+    if (Approved?) then (Yes)
+        :Approve Request;
+    else (No)
+        :Reject Request;
+        stop
+    endif
+}
+
+partition "Treasury Specialist" {
+
+    :Run Liquidity Check;
+
+    if (Liquidity available?) then (Yes)
+        :Generate Payment Proposal;
+        :Review Payment Proposal;
+        :Release Payments;
+    else (No)
+        :Block Payment;
+        stop
+    endif
+}
+
+partition "Bank Communication" {
+    :Generate ISO 20022 Payment File;
+    :Transmit Payment File;
+}
+
+partition "External Bank" {
+    :Execute Payment;
+    :Generate Bank Statement;
+}
+
+partition "Cash Management" {
+    :Import Bank Statement;
+    :Automatic Reconciliation;
+    :Update Cash Position;
+    :Update Liquidity Forecast;
+}
+
+stop
+
+@enduml
