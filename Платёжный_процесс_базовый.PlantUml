@@ -1,0 +1,112 @@
+@startuml End-to-End Payment Process
+title SAP Treasury - End-to-End Payment Process\nСквозной платёжный процесс SAP Treasury
+
+start
+
+partition "ERP (FI/MM/SD)\nERP (ФИ/ММ/СД)" {
+    :Incoming Payment Request Demand\nВходящая потребность в заявке на оплату;
+    :Generate Payment Request\nФормирование заявки на оплату;
+}
+
+partition "Treasury & Risk Management\nКазначейство и управление рисками" {
+
+    repeat
+        :Import Payment Request\nИмпорт запроса на оплату;
+        :Validate Request\nПроверка запроса;
+    backward:Send Validation Error & Correct Request (ERP)\nОтправка ошибки и исправление запроса (ERP);
+    repeat while (Validation successful?\nПроверка успешна?) is (No\nНет) not (Yes\nДа)
+
+    :Create Payment Request Object\nСоздание объекта запроса на оплату;
+
+    repeat
+        :Approval Workflow\nПроцесс согласования;
+        if (Approved?\nСогласовано?) then (Yes\nДа)
+            :Set Status: Approved\nСтатус: Согласовано;
+        else (No\nНет)
+            :Record Rejection Reason\nФиксация причины отклонения;
+            if (Rework possible?\nВозможна доработка?) then (Yes\nДа)
+                :Return to Initiator & Correct Request\nВозврат инициатору и корректировка запроса;
+            else (No\nНет)
+                :Cancel Request (Status: Rejected)\nОтмена запроса (Статус: Отклонено);
+                stop
+            endif
+        endif
+    repeat while (Resubmitted after rework?\nПовторная отправка после доработки?) is (Yes\nДа) not (No\nНет)
+}
+
+partition "Cash Management\nУправление денежными средствами" {
+
+    :Calculate Cash Position\nРасчёт денежной позиции;
+
+    :Run Liquidity Forecast\nПрогноз ликвидности;
+
+    repeat
+        if (Enough Liquidity?\nДостаточно ликвидности?) then (Yes\nДа)
+        else (No\nНет)
+            :Payment Block\nБлокировка платежа;
+            if (Resolution possible?\nВозможно урегулирование?) then (Yes\nДа)
+                :Escalate / Raise Financing / Reschedule Payment\nЭскалация / Привлечение финансирования / Перенос даты платежа;
+            else (No\nНет)
+                :Cancel Payment (Status: No Liquidity)\nОтмена платежа (Статус: Нет ликвидности);
+                stop
+            endif
+        endif
+    repeat while (Liquidity resolved?\nЛиквидность обеспечена?) is (No\nНет) not (Yes\nДа)
+}
+
+partition "Payment Factory\nПлатёжная фабрика" {
+
+    repeat
+        :Create Payment Proposal\nСоздание платёжного предложения;
+        :Review Proposal\nПроверка предложения;
+    backward:Adjust / Reject Proposal\nКорректировка / отклонение предложения;
+    repeat while (Proposal approved?\nПредложение утверждено?) is (No\nНет) not (Yes\nДа)
+
+    :Generate Payment Order\nФормирование платёжного поручения;
+}
+
+partition "Bank Communication Management\nУправление банковскими коммуникациями" {
+
+    :Generate ISO20022 XML\nФормирование XML ISO20022;
+
+    :Sign & Encrypt Payment File\nПодписание и шифрование платёжного файла;
+
+    :Transmit Payment File\nПередача платёжного файла;
+
+    :Receive Bank Acknowledgement (pain.002)\nПолучение квитанции банка (pain.002);
+
+    if (Bank accepted file?\nБанк принял файл?) then (Yes\nДа)
+    else (No\nНет)
+        :Handle Rejection & Resubmit File\nОбработка отказа и повторная отправка файла;
+        stop
+    endif
+}
+
+partition "External Bank\nВнешний банк" {
+
+    if (Payment executed?\nПлатёж исполнен?) then (Yes\nДа)
+        :Execute Payment\nИсполнение платежа;
+    else (No\nНет)
+        :Payment Rejected / Returned by Bank\nПлатёж отклонён / возвращён банком;
+        :Notify Treasury & Investigate\nУведомление казначейства и разбор причины;
+    endif
+
+    :Return Bank Statement\nВозврат банковской выписки;
+}
+
+partition "Cash Management\nУправление денежными средствами" {
+
+    :Import Statement\nИмпорт выписки;
+
+    :Automatic Matching\nАвтоматическое сопоставление;
+
+    :Reconciliation\nСверка;
+
+    :Update Cash Position\nОбновление денежной позиции;
+
+    :Update Forecast\nОбновление прогноза;
+}
+
+stop
+
+@enduml
