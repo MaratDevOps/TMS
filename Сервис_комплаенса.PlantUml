@@ -1,0 +1,53 @@
+@startuml Compliance Screening Service
+title Compliance Screening Service\nСервис комплаенса (проверки)
+
+start
+
+:Receive Screening Request\nПолучение запроса на проверку;
+note right
+  Вход: объект платежа
+  (стороны, сумма, валюта, реквизиты,
+  документ-источник)
+end note
+
+partition "Sanctions Screening\nСанкционный скрининг" {
+    :Sanctions List Screening\nПроверка по санкционным спискам;
+}
+
+partition "AML\nПОД/ФТ" {
+    :AML Check\nПроверка AML (ПОД/ФТ);
+}
+
+partition "Duplicate Control\nКонтроль дублей" {
+    :Duplicate Payment Check\nКонтроль дублей платежей;
+}
+
+:Aggregate Results & Score\nАгрегация результатов и риск-оценка;
+
+if (Any hit / risk?\nЕсть совпадение / риск?) then (Yes\nДа)
+    :Return Decision: Failed (with reasons)\nРешение: Не пройдено (с причинами);
+else (No\nНет)
+    :Return Decision: Passed\nРешение: Пройдено;
+endif
+
+note right
+  Выход: решение комплаенса
+  (Passed / Failed) с причинами,
+  возвращается в основной процесс
+  (шаг "Receive Compliance Decision")
+end note
+
+stop
+
+legend right
+  == RACI (роли и ответственные) ==
+  Compliance Service / Сервис комплаенса:  R: выполнение проверок и оценка
+  Compliance Officer / Комплаенс-офицер:   A: политика проверок, решения по совпадениям
+  Treasury / Казначейство:                 I: получает решение, инициирует разбор
+  ----
+  Проверки: Sanctions List (OFAC/EU/UN/HMT), AML (ПОД/ФТ), Duplicate Payment Check.
+  Решение сервиса потребляется основным процессом в партиции
+  "Compliance Service (External)" (Платёжный_процесс_полный.PlantUml).
+endlegend
+
+@enduml
