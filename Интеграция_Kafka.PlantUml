@@ -1,0 +1,67 @@
+@startuml Payment Demand Integration via Kafka
+title Payment Demand Integration via Kafka\nИнтеграция источников потребности через Kafka
+
+skinparam componentStyle rectangle
+left to right direction
+
+package "Source Systems - Producers\nСистемы-источники (продюсеры)" {
+    [MM - Procurement\nЗакупки] as MM
+    [SD / FI - Receivables\nРасчёты с покупателями] as SD
+    [FI - Financial Accounting\nФинансовый учёт] as FI
+    [TRM Deals\nКазначейские сделки] as TRMSRC
+}
+
+[Outbox / Event Publisher\nВыгрузка событий (Outbox)\n(Kafka Connect / SAP AIF)] as OUTBOX
+
+node "Apache Kafka" {
+    queue "Topic: payment.demand\nключ = контрагент/документ\nпартиции для параллелизма" as T1
+    queue "Topic: payment.demand.DLQ\nнеобработанные события" as DLQ
+    [Schema Registry\nAvro/JSON-схемы событий] as SR
+}
+
+package "Treasury System (TRM) - Consumer\nКазначейская система (консьюмер)" {
+    [Demand Consumer\nconsumer group: trm-demand] as CONS
+    [Payment Request Builder\nФормирование заявки] as PRB
+    database "Payment Request\nЗаявка на оплату" as PR
+}
+
+' --- Публикация событий ---
+MM --> OUTBOX
+SD --> OUTBOX
+FI --> OUTBOX
+TRMSRC --> OUTBOX
+OUTBOX --> T1 : produce\n(publish event)
+
+' --- Контракты схем ---
+OUTBOX ..> SR : register / validate schema
+CONS ..> SR : deserialize
+
+' --- Потребление ---
+T1 --> CONS : consume\n(subscribe)
+CONS --> PRB
+PRB --> PR : upsert (идемпотентно\nпо ключу события)
+
+' --- Обработка ошибок ---
+CONS --> DLQ : on error\n(после ретраев)
+
+note bottom of T1
+  Гарантии: at-least-once доставка,
+  порядок в пределах партиции (по ключу).
+  Дедупликация на стороне консьюмера.
+end note
+
+note bottom of PR
+  Каждое событие-потребность (из MM/SD/FI/TRM)
+  преобразуется в объект "Заявка на оплату".
+  Идемпотентность по ключу события предотвращает дубли.
+end note
+
+legend right
+  Producer / Продюсер: система-источник, публикующая событие потребности.
+  Topic / Топик: канал событий; партиции обеспечивают параллелизм и порядок по ключу.
+  Consumer group / Группа консьюмеров: масштабирование обработки в TRM.
+  Schema Registry: контроль контрактов событий (совместимость версий).
+  DLQ: изоляция необработанных событий для разбора.
+endlegend
+
+@enduml
