@@ -7,30 +7,23 @@ hide circle
 hide empty members
 
 package "SAP ERP" {
-
     package "MM - Procurement\nMM - Закупки" {
-        class "Vendor Invoice (MIRO)\nСчёт поставщика (MIRO)" as MM1
-        class "Open Vendor Item (FI-AP)\nОткрытая позиция кредитора" as MM2
+        class "Vendor Invoice (MIRO)\nСчёт поставщика (MIRO)\nДокумент-основание" as MM1
     }
 
     package "SD / FI - Receivables\nSD/FI - Расчёты с покупателями" {
-        class "Customer Refund\nВозврат покупателю" as SD1
         class "Credit Note\nКредит-нота" as SD2
-        class "Down Payment\nАванс" as SD3
     }
 
     package "FI - Financial Accounting\nFI - Финансовый учёт" {
+        class "Open Vendor Item (FI-AP)\nОткрытая позиция кредитора" as MM2
+        class "Open Customer Item (FI-AR)\nОткрытая позиция дебитора" as AR1
         class "Taxes\nНалоги" as FI1
         class "Payroll\nЗарплата" as FI2
         class "Contract Payment\nПлатёж по договору" as FI3
         class "Manual Request\nРучная заявка" as FI4
     }
 
-    package "TRM Deals\nTRM - Казначейские сделки" {
-        class "Financial Instrument\nФин. инструмент" as TR1
-        class "Loan\nЗаём" as TR2
-        class "Deposit\nДепозит" as TR3
-    }
 }
 
 package "Treasury System (TRM)\nКазначейская система" {
@@ -39,30 +32,29 @@ package "Treasury System (TRM)\nКазначейская система" {
         + Валюта / Currency
         + Контрагент / Counterparty
         + Срок оплаты / Due date
-        + Источник / Source (MM/SD/FI/TRM)
+        + Источник / Source (FI)
         + Документ-основание / Source document
     }
 }
 
-' Все сущности-источники порождают потребность -> одну заявку на оплату (многие -> один)
-MM1 "*" --> "1" PR
-MM2 "*" --> "1" PR
-SD1 "*" --> "1" PR
-SD2 "*" --> "1" PR
-SD3 "*" --> "1" PR
-FI1 "*" --> "1" PR
-FI2 "*" --> "1" PR
-FI3 "*" --> "1" PR
-FI4 "*" --> "1" PR
-TR1 "*" --> "1" PR
-TR2 "*" --> "1" PR
-TR3 "*" --> "1" PR
+' Документы-основания создают FI-позиции; события публикуются по FI-позициям.
+MM1 ..> MM2 : creates / создаёт
+SD2 ..> AR1 : creates / создаёт
+
+' Каждая исходная потребность формализуется в одну заявку на оплату (1 -> 1).
+MM2 "1" --> "1" PR : payment.demand
+AR1 "1" --> "1" PR : payment.demand
+FI1 "1" --> "1" PR
+FI2 "1" --> "1" PR
+FI3 "1" --> "1" PR
+FI4 "1" --> "1" PR
 
 note bottom of PR
-  Каждая сущность-источник порождает входящую потребность,
+  Каждая FI-сущность-источник порождает входящую потребность,
   которая формализуется в один объект "Заявка на оплату"
   (Payment Request) в казначейской системе.
-  Кардинальность: многие источники -> одна заявка (* -> 1).
+  Кардинальность: одна потребность -> одна заявка (1 -> 1).
+  Объединение заявок выполняется позднее внутри казначейской системы.
 end note
 
 @enduml
