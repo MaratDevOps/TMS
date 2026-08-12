@@ -1,0 +1,129 @@
+@startuml FI Entities
+title FI — Financial Accounting\nДетализация сущностей-источников платёжной потребности
+
+left to right direction
+skinparam linetype ortho
+hide circle
+hide empty members
+
+package "SAP ERP" {
+    package "FI - Financial Accounting\nFI - Финансовый учёт" {
+        class "Open Vendor Item (FI-AP)\nОткрытая позиция кредитора" as FI_AP {
+            + Сумма / Amount
+            + Валюта / Currency
+            + Кредитор / Vendor
+            + Срок оплаты / Due date
+            + Дата базовой линии / Baseline date
+            + Блокировка платежа / Payment block
+            + Документ-основание / Origin document
+            + Статус / Status
+            + Назначение платежа / Payment purpose
+            + Способ оплаты / Payment method
+            --
+            + Тип документа основания/ BLART Origin document
+            + Номер документа основания/ number Origin document
+            + Тип документа открытая позиция / BLART document
+            + Номер документа открытая позиция/ number document
+            + Номер FI-позиции / number FI position
+            + Код компании / Company code (BUKRS)
+            + Финансовый год / Fiscal year (GJAHR)
+         
+        }
+
+        class "Open Customer Item (FI-AR)\nОткрытая позиция дебитора" as FI_AR {
+            + Дебитор / Customer
+            + Сумма возврата / Refund amount
+            + Валюта / Currency
+            + Срок выплаты / Due date
+            + Дата базовой линии / Baseline date
+            + Блокировка платежа / Payment block
+            + Кредит-нота / Credit note
+            --
+            + Номер FI-позиции / Document number
+            + Код компании / Company code (BUKRS)
+            + Финансовый год / Fiscal year (GJAHR)
+        }
+
+        class "Taxes\nНалоги" as FI_TAX {
+            + Вид налога / Tax type
+            + Получатель / Recipient (бюджет, ФНС)
+            + Сумма / Amount
+            + Валюта / Currency
+            + Срок уплаты / Due date
+            + Основание / Payment basis
+            --
+            + Номер обязательства / Document number
+            + Код компании / Company code (BUKRS)
+            + Финансовый год / Fiscal year (GJAHR)
+        }
+
+        class "Payroll\nЗарплата" as FI_PAYROLL {
+            + Период расчёта / Payroll period
+            + Реестр получателей / Recipient register
+            + Сумма / Amount
+            + Валюта / Currency
+            + Срок выплаты / Due date
+            + Основание / Payment basis
+            --
+            + Номер реестра / Register number
+            + Код компании / Company code (BUKRS)
+            + Финансовый год / Fiscal year (GJAHR)
+        }
+
+        class "Contract Payment\nПлатёж по договору" as FI_CONTRACT {
+            + Контрагент / Counterparty
+            + Сумма / Amount
+            + Валюта / Currency
+            + Срок оплаты / Due date
+            + Договор / Contract reference
+            + Периодичность / Frequency
+            --
+            + Номер обязательства / Document number
+            + Код компании / Company code (BUKRS)
+            + Финансовый год / Fiscal year (GJAHR)
+        }
+
+        class "Manual Request\nРучная заявка" as FI_MANUAL {
+            + Инициатор / Initiator
+            + Контрагент / Counterparty
+            + Сумма / Amount
+            + Валюта / Currency
+            + Срок оплаты / Due date
+            + Обоснование / Justification
+            --
+            + Номер заявки / Request number
+            + Код компании / Company code (BUKRS)
+            + Финансовый год / Fiscal year (GJAHR)
+        }
+    }
+}
+
+package "Treasury System (TRM)\nКазначейская система" {
+    class "Payment Request\nЗаявка на оплату" as PR {
+        + Сумма / Amount
+        + Валюта / Currency
+        + Контрагент / Counterparty
+        + Срок оплаты / Due date
+        + Код компании / Company code (BUKRS)
+        + Документ-основание / Source document
+        + Назначение платежа / Payment purpose
+        + Номер FI-позиции / number FI position
+        + Способ оплаты / Payment method
+        + Статус / Status
+        + Блокировка платежа / Payment block 
+    }
+}
+
+note bottom of FI_AP
+  Каждая FI-сущность является самостоятельным источником
+  одного события payment.demand и одной Payment Request в TRM.
+  Идентификация: document number + BUKRS + GJAHR.
+end note
+
+note bottom of FI_TAX
+  Правила технического номера (DOCNO) и роли контрагента
+  для TAX, PAYROLL, CONTRACT_PAYMENT и MANUAL_REQUEST
+  требуют отдельного согласования.
+end note
+
+@enduml
