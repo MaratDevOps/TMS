@@ -1,0 +1,84 @@
+@startuml Kafka Context Integration - Alternative
+title Kafka Context / Integration Diagram\nВариант с разделением основного и обратного потоков
+
+left to right direction
+skinparam componentStyle rectangle
+skinparam linetype ortho
+
+package "SAP FI\nФинансовый учёт" {
+    component "Open Vendor Item (FI-AP)\nОткрытая позиция кредитора" as FI_AP
+    component "Open Customer Item (FI-AR)\nОткрытая позиция дебитора" as FI_AR
+    component "Taxes\nНалоги" as TAX
+    component "Payroll\nЗарплата" as PAYROLL
+    component "Contract Payment\nПлатёж по договору" as CONTRACT
+    component "Manual Request\nРучная заявка" as MANUAL
+    component "FI Demand Producer / Outbox\nПубликация платёжных потребностей" as FI_PRODUCER
+    component "FI Status Consumer\nОбработка статусов заявок" as FI_STATUS_CONSUMER
+
+    FI_AP -[hidden]right-> FI_AR
+    FI_AR -[hidden]right-> TAX
+    TAX -[hidden]right-> PAYROLL
+    PAYROLL -[hidden]right-> CONTRACT
+    CONTRACT -[hidden]right-> MANUAL
+    FI_AP -[hidden]down-> FI_PRODUCER
+    FI_PRODUCER -[hidden]down-> FI_STATUS_CONSUMER
+}
+
+node "Apache Kafka Cluster" as KAFKA {
+    queue "payment.demand\n4 partitions" as DEMAND
+    queue "payment.demand.DLQ\nОшибки обработки" as DLQ
+    queue "payment.status\nСтатусы заявок" as STATUS
+    queue "payment.status.DLQ\nОшибки обработки статусов" as STATUS_DLQ
+
+    DEMAND -[hidden]down-> DLQ
+    DEMAND -[hidden]down-> STATUS
+    STATUS -[hidden]down-> STATUS_DLQ
+}
+
+package "Treasury System (TRM)\nКазначейская система" {
+    component "Demand Consumer\nconsumer group: trm-demand" as DEMAND_CONSUMER
+    component "Payment Request Builder\nСоздание заявки" as BUILDER
+    database "Payment Request\nЗаявка на оплату" as REQUEST
+    component "Status Publisher\nПубликация изменения статуса" as STATUS_PUBLISHER
+
+    DEMAND_CONSUMER -[hidden]down-> BUILDER
+    BUILDER -[hidden]down-> REQUEST
+    REQUEST -[hidden]down-> STATUS_PUBLISHER
+}
+
+' Шесть FI-источников создают потребности через единый Outbox.
+FI_AP --> FI_PRODUCER
+FI_AR --> FI_PRODUCER
+TAX --> FI_PRODUCER
+PAYROLL --> FI_PRODUCER
+CONTRACT --> FI_PRODUCER
+MANUAL --> FI_PRODUCER
+
+' Основной поток: FI создаёт потребность, TRM создаёт заявку.
+FI_PRODUCER --> DEMAND : produce\npayment.demand
+DEMAND --> DEMAND_CONSUMER : consume
+DEMAND_CONSUMER --> BUILDER : валидированная потребность
+BUILDER --> REQUEST : create / idempotent upsert
+
+' Ошибки чтения и обработки изолируются в DLQ.
+DEMAND_CONSUMER --> DLQ : ошибка после retry
+
+' Обратный поток: TRM публикует изменение статуса отдельным событием.
+REQUEST --> STATUS_PUBLISHER : изменение статуса
+STATUS_PUBLISHER --> STATUS : produce\npayment.status
+STATUS --> FI_STATUS_CONSUMER : consume
+FI_STATUS_CONSUMER --> STATUS_DLQ : ошибка после retry
+
+note right of STATUS
+  payment.status — предлагаемый отдельный топик.
+  Его event contract, статусы и правила
+  обновления FI должны быть согласованы отдельно.
+end note
+
+legend bottom
+  Сплошная связь — передача событий или вызов компонента.
+  Основной поток: FI → Kafka → TRM.
+  Обратный поток статусов: TRM → Kafka → FI.
+endlegend
+
+@enduml
