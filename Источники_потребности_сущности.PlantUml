@@ -32,7 +32,7 @@ package "Treasury System (TRM)\nКазначейская система" {
         + Валюта / Currency
         + Контрагент / Counterparty
         + Срок оплаты / Due date
-        + Источник / Source (FI)
+        + Код компании / Company code (BUKRS)
         + Документ-основание / Source document
     }
 }
