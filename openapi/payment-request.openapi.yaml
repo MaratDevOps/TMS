@@ -1,0 +1,359 @@
+openapi: 3.0.3
+info:
+  title: TRM Payment Request API
+  version: 1.0.0
+  description: |
+    API для создания и получения заявок на оплату в Treasury Risk Management (TRM).
+    Одна заявка создаётся для одной открытой позиции кредитора FI-AP.
+    Изменения статуса, блокировки и отмена после создания синхронизируются
+    отдельным событием `payment.status`.
+servers:
+  - url: /api/v1
+    description: Базовый URL TRM API
+tags:
+  - name: Payment requests
+    description: Заявки на оплату
+paths:
+  /payment-requests:
+    get:
+      tags: [Payment requests]
+      summary: Получить список заявок на оплату
+      operationId: listPaymentRequests
+      parameters:
+        - $ref: '#/components/parameters/CompanyCode'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/SourceLineItemId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Постраничный список заявок
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequestPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags: [Payment requests]
+      summary: Создать заявку на оплату
+      description: |
+        Создаёт заявку со статусом `Created`. Повторная отправка запроса
+        с тем же `eventId` не должна создавать вторую заявку.
+      operationId: createPaymentRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Заявка создана
+          headers:
+            Location:
+              description: URL созданной заявки
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequest'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Заявка с указанным sourceLineItemId уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /payment-requests/{paymentRequestId}:
+    get:
+      tags: [Payment requests]
+      summary: Получить заявку по идентификатору
+      operationId: getPaymentRequest
+      parameters:
+        - $ref: '#/components/parameters/PaymentRequestId'
+      responses:
+        '200':
+          description: Заявка найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    PaymentRequestId:
+      name: paymentRequestId
+      in: path
+      required: true
+      description: Уникальный идентификатор заявки в TRM
+      schema:
+        type: string
+        format: uuid
+    CompanyCode:
+      name: companyCode
+      in: query
+      description: Код компании SAP (BUKRS)
+      schema:
+        type: string
+        example: '1000'
+    Status:
+      name: status
+      in: query
+      description: Текущий статус заявки
+      schema:
+        $ref: '#/components/schemas/PaymentRequestStatus'
+    SourceLineItemId:
+      name: sourceLineItemId
+      in: query
+      description: Составной идентификатор исходной FI-позиции
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      description: Номер страницы, начиная с 1
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Число элементов на странице
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    ValidationError:
+      description: Ошибка валидации запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Заявка не найдена
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - eventId
+        - companyCode
+        - fiscalYear
+        - accountingDocumentType
+        - accountingDocumentNumber
+        - numberFiPosition
+        - lineItemID
+        - sourceLineItemId
+        - sourceLineItemReference
+        - counterpartyId
+        - counterpartyRole
+        - amount
+        - currency
+        - dueDate
+        - paymentPurpose
+        - paymentMethod
+        - paymentBlock
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Идентификатор записи FI Outbox для дедупликации
+        companyCode:
+          type: string
+          description: Код компании SAP (BUKRS)
+          example: '1000'
+        fiscalYear:
+          type: string
+          description: Финансовый год SAP (GJAHR)
+          example: '2026'
+        accountingDocumentType:
+          type: string
+          description: Тип FI-документа (BLART)
+          example: KR
+        accountingDocumentNumber:
+          type: string
+          description: Номер FI-документа
+          example: '1900012345'
+        numberFiPosition:
+          $ref: '#/components/schemas/FiPositionNumber'
+        lineItemID:
+          type: string
+          description: Канонический строковый номер FI-позиции
+          example: FI_POSITION|BUKRS=1000|BLART=KR|DOCNO=1900012345|DOCDATA=2026-08-12|GJAHR=2026|POSNO=001
+        sourceLineItemId:
+          type: string
+          description: Составной идентификатор исходной FI-позиции
+          example: FI|role=VENDOR|CP=0001007788|DOCTYPE=VENDOR_OPEN_ITEM|DOCNO=1900012345-001|BUKRS=1000|GJAHR=2026
+        sourceLineItemReference:
+          type: string
+          description: Техническая ссылка для открытия позиции в FI
+        originDocument:
+          $ref: '#/components/schemas/OriginDocument'
+        counterpartyId:
+          type: string
+          description: Технический идентификатор кредитора
+          example: '0001007788'
+        counterpartyRole:
+          type: string
+          enum: [VENDOR]
+          description: Роль контрагента
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          description: Сумма платежа
+          example: 125000.00
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Трёхбуквенный код валюты ISO 4217
+          example: RUB
+        dueDate:
+          type: string
+          format: date
+          description: Рассчитанная в FI дата оплаты
+        paymentPurpose:
+          type: string
+          minLength: 1
+          description: Назначение платежа
+          example: Оплата по счёту поставщика
+        paymentMethod:
+          type: string
+          minLength: 1
+          description: Код способа платежа из единого классификатора
+          example: BANK_TRANSFER
+        paymentBlock:
+          type: boolean
+          description: Признак блокировки платежа
+    PaymentRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreatePaymentRequest'
+        - type: object
+          required: [id, status, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Уникальный идентификатор заявки в TRM
+            status:
+              $ref: '#/components/schemas/PaymentRequestStatus'
+            createdAt:
+              type: string
+              format: date-time
+              description: Время создания заявки в TRM
+    FiPositionNumber:
+      type: object
+      additionalProperties: false
+      required: [companyCode, documentType, documentNumber, documentData, fiscalYear, positionNumber]
+      properties:
+        companyCode:
+          type: string
+          example: '1000'
+        documentType:
+          type: string
+          description: Тип FI-документа (BLART)
+          example: KR
+        documentNumber:
+          type: string
+          description: Номер FI-документа
+          example: '1900012345'
+        documentData:
+          type: string
+          format: date
+          description: Дата FI-документа
+          example: '2026-08-12'
+        fiscalYear:
+          type: string
+          example: '2026'
+        positionNumber:
+          type: string
+          description: Номер позиции FI
+          example: '001'
+    OriginDocument:
+      type: object
+      additionalProperties: false
+      required: [companyCode, documentType, documentNumber, documentData]
+      description: Документ-основание; передаётся, если позиция создана из внешнего документа, например MIRO
+      properties:
+        companyCode:
+          type: string
+          example: '1000'
+        documentType:
+          type: string
+          example: MIRO
+        documentNumber:
+          type: string
+          example: '5100001234'
+        documentData:
+          type: string
+          format: date
+          description: Дата документа-основания
+          example: '2026-08-12'
+    PaymentRequestStatus:
+      type: string
+      description: Статус жизненного цикла заявки
+      enum:
+        - Created
+        - Validated
+        - Approved
+        - Compliant
+        - Funded
+        - Proposed
+        - Ordered
+        - Transmitted
+        - Executed
+        - Reconciled
+        - Rejected
+        - Cancelled
+        - ComplianceRejected
+        - ReturnedByBank
+    PaymentRequestPage:
+      type: object
+      required: [items, page, pageSize, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentRequest'
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        totalItems:
+          type: integer
+          minimum: 0
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Поле amount должно быть больше нуля
+        details:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
