@@ -22,6 +22,7 @@ package "SAP ERP" {
             --
             + Тип документа основания/ BLART Origin document
             + Номер документа основания/ number Origin document
+            + Дата документа основания/ documentData Origin document
             + Тип документа открытая позиция / BLART document
             + Номер документа открытая позиция/ number document
             + Номер FI-позиции / number FI position
@@ -105,7 +106,7 @@ package "Treasury System (TRM)\nКазначейская система" {
         + Контрагент / Counterparty
         + Срок оплаты / Due date
         + Код компании / Company code (BUKRS)
-        + Документ-основание / Source document
+        + Документ-основание / originDocument
         + Назначение платежа / Payment purpose
         + Номер FI-позиции / number FI position
         + Способ оплаты / Payment method

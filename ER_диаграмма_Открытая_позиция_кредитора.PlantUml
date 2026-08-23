@@ -1,0 +1,55 @@
+@startuml FI_AP_Open_Vendor_Item_ER
+title Открытая позиция кредитора FI-AP\nER-диаграмма по контракту payment.demand
+
+hide circle
+skinparam linetype ortho
+
+entity "Open Vendor Item (FI-AP)\nОткрытая позиция кредитора" as OpenVendorItem {
+  * sourceLineItemId : string <<PK>>
+  --
+  * documentType : string = VENDOR_OPEN_ITEM
+  * companyCode : string <<BUKRS>>
+  * fiscalYear : string <<GJAHR>>
+  * accountingDocumentType : string <<BLART>>
+  * accountingDocumentNumber : string
+  * lineItemID : string
+  * sourceLineItemReference : string
+  --
+  * counterpartyId : string
+  * counterpartyRole : string = VENDOR
+  * amount : decimal > 0
+  * currency : string <<ISO 4217>>
+  * dueDate : date
+  * paymentPurpose : string
+  * paymentMethod : string
+  * paymentBlock : boolean
+}
+
+entity "numberFiPosition\nНомер FI-позиции" as FiPositionNumber {
+  * companyCode : string <<BUKRS>>
+  * documentType : string <<BLART>>
+  * fiscalYear : string <<GJAHR>>
+  * positionNumber : string
+}
+
+entity "originDocument\nДокумент-основание" as OriginDocument {
+  * companyCode : string <<BUKRS>>
+  * documentType : string
+  * documentNumber : string
+  * documentData : date
+}
+
+OpenVendorItem ||--|| FiPositionNumber : numberFiPosition
+OpenVendorItem ||--o| OriginDocument : originDocument
+
+note bottom of OpenVendorItem
+  sourceLineItemId совпадает с Kafka key.
+  lineItemID — каноническое строковое представление
+  номера FI-позиции.
+end note
+
+note right of OriginDocument
+  Заполняется только если позиция создана
+  из внешнего документа, например MIRO.
+end note
+@enduml

@@ -17,7 +17,7 @@
 
 ## 2. Kafka key и идентификаторы
 
-Kafka key и `sourceDocumentId` совпадают и формируются по правилу:
+Kafka key и `sourceLineItemId` совпадают и формируются по правилу:
 
 ```text
 FI|role=VENDOR|CP=<VENDOR_ID>|DOCTYPE=VENDOR_OPEN_ITEM|
@@ -32,7 +32,7 @@ BUKRS=<COMPANY_CODE>|GJAHR=<FISCAL_YEAR>
 |---|---|
 | `eventId` | UUID записи Outbox. Не изменяется при retry той же записи. |
 | `messageKey` | Kafka key; определяет партицию и порядок событий одной FI-потребности. |
-| `sourceDocumentId` | Равен `messageKey`; сохраняется в заявке для трассировки. |
+| `sourceLineItemId` | Равен `messageKey`; сохраняется в заявке для трассировки. |
 | `correlationId` | Сквозной ID операции FI → Kafka → TRM. Правило генерации требует согласования. |
 
 ## 3. Структура события
@@ -59,9 +59,9 @@ BUKRS=<COMPANY_CODE>|GJAHR=<FISCAL_YEAR>
 | `accountingDocumentType` | string | Да | Тип FI-документа `BLART`. |
 | `accountingDocumentNumber` | string | Да | Номер FI-документа. |
 | `numberFiPosition` | object | Да | Структура номера FI-позиции из раздела 3.3. |
-| `lineItemNumber` | string | Да | Каноническая строка, сформированная из `numberFiPosition`. |
-| `sourceDocumentId` | string | Да | Составной ID из раздела 2. |
-| `sourceDocumentReference` | string | Да | Техническая ссылка для открытия FI-позиции; формат требует согласования. |
+| `lineItemID` | string | Да | Каноническая строка, сформированная из `numberFiPosition`. |
+| `sourceLineItemId` | string | Да | Составной ID исходной FI-позиции из раздела 2. |
+| `sourceLineItemReference` | string | Да | Техническая ссылка для открытия FI-позиции; формат требует согласования. |
 
 ### 3.3. Номер FI-позиции
 
@@ -71,18 +71,21 @@ BUKRS=<COMPANY_CODE>|GJAHR=<FISCAL_YEAR>
 |---|---|:---:|---|
 | `numberFiPosition.companyCode` | string | Да | Код компании `BUKRS`. |
 | `numberFiPosition.documentType` | string | Да | Тип FI-документа `BLART`. |
+| `numberFiPosition.documentNumber` | string | Да | Номер FI-документа. |
+| `numberFiPosition.documentData` | date | Да | Дата FI-документа в формате `YYYY-MM-DD`. |
 | `numberFiPosition.fiscalYear` | string | Да | Финансовый год `GJAHR`. |
 | `numberFiPosition.positionNumber` | string | Да | Номер FI-позиции. |
 
-`lineItemNumber` является каноническим строковым представлением этой структуры:
+`lineItemID` является каноническим строковым представлением этой структуры:
 
 ```text
 FI_POSITION|BUKRS=<COMPANY_CODE>|BLART=<DOCUMENT_TYPE>|
+DOCNO=<DOCUMENT_NUMBER>|DOCDATA=<DOCUMENT_DATA>|
 GJAHR=<FISCAL_YEAR>|POSNO=<POSITION_NUMBER>
 ```
 
-Структура не заменяет `accountingDocumentNumber`: номер документа сохраняется отдельным
-реквизитом и вместе с номером позиции используется для однозначного поиска объекта в FI.
+`accountingDocumentNumber` также передаётся отдельным реквизитом для прямого поиска
+FI-документа; его значение совпадает с `numberFiPosition.documentNumber`.
 
 ### 3.4. Документ-основание
 
@@ -94,6 +97,7 @@ GJAHR=<FISCAL_YEAR>|POSNO=<POSITION_NUMBER>
 | `originDocument.companyCode` | string | Условно | Код компании `BUKRS`. |
 | `originDocument.documentType` | string | Условно | Тип документа-основания. |
 | `originDocument.documentNumber` | string | Условно | Номер документа-основания. |
+| `originDocument.documentData` | date | Условно | Дата документа-основания в формате `YYYY-MM-DD`. |
 
 ### 3.5. Данные платёжной потребности
 
@@ -117,14 +121,14 @@ GJAHR=<FISCAL_YEAR>|POSNO=<POSITION_NUMBER>
 | `Counterparty` | `counterpartyId` |
 | `Due date` | `dueDate` |
 | `Company code (BUKRS)` | `companyCode` |
-| `Source document` | `originDocument` |
+| `originDocument` | `originDocument` |
 | `Payment purpose` | `paymentPurpose` |
 | `Number FI position` | `numberFiPosition` |
 | `Payment method` | `paymentMethod` |
 | `Payment block` | `paymentBlock` |
 | `Status` | `Created` при создании заявки в TRM. |
 
-TRM должен сохранять `eventId`, `sourceDocumentId` и `sourceDocumentReference` как
+TRM должен сохранять `eventId`, `sourceLineItemId` и `sourceLineItemReference` как
 технические реквизиты интеграции, даже если они не отображаются в пользовательской форме
 заявки.
 
@@ -147,16 +151,19 @@ TRM должен сохранять `eventId`, `sourceDocumentId` и `sourceDocu
   "numberFiPosition": {
     "companyCode": "1000",
     "documentType": "KR",
+    "documentNumber": "1900012345",
+    "documentData": "2026-08-12",
     "fiscalYear": "2026",
     "positionNumber": "001"
   },
-  "lineItemNumber": "FI_POSITION|BUKRS=1000|BLART=KR|GJAHR=2026|POSNO=001",
-  "sourceDocumentId": "FI|role=VENDOR|CP=0001007788|DOCTYPE=VENDOR_OPEN_ITEM|DOCNO=1900012345-001|BUKRS=1000|GJAHR=2026",
-  "sourceDocumentReference": "TBD",
+  "lineItemID": "FI_POSITION|BUKRS=1000|BLART=KR|DOCNO=1900012345|DOCDATA=2026-08-12|GJAHR=2026|POSNO=001",
+  "sourceLineItemId": "FI|role=VENDOR|CP=0001007788|DOCTYPE=VENDOR_OPEN_ITEM|DOCNO=1900012345-001|BUKRS=1000|GJAHR=2026",
+  "sourceLineItemReference": "TBD",
   "originDocument": {
     "companyCode": "1000",
     "documentType": "MIRO",
-    "documentNumber": "5100001234"
+    "documentNumber": "5100001234",
+    "documentData": "2026-08-12"
   },
   "counterpartyId": "0001007788",
   "counterpartyRole": "VENDOR",
@@ -180,7 +187,7 @@ TRM должен сохранять `eventId`, `sourceDocumentId` и `sourceDocu
 
 ## 7. Открытые решения
 
-1. Формат `correlationId` и `sourceDocumentReference`.
+1. Формат `correlationId` и `sourceLineItemReference`.
 2. Версия UUID для `eventId`.
 3. Полный состав и владельцы единого классификатора типов платежа.
 4. Формат хранения и отображения технических реквизитов интеграции в TRM.

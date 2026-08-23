@@ -1,0 +1,107 @@
+@startuml TRM_Payment_Request_ER
+title Заявка на оплату в TRM\nER-диаграмма по контракту FI-AP payment.demand
+
+hide circle
+skinparam linetype ortho
+
+entity "Payment Request (TRM)\nЗаявка на оплату" as PaymentRequest {
+  * id : UUID <<PK>>
+  --
+  * counterpartyId : string <<FK → Counterparties.id>>
+  * amount : decimal > 0
+  * currency : string <<ISO 4217>>
+  * dueDate : date
+  * paymentPurpose : string
+  * paymentMethod : string <<FK → PaymentMethods.code>>
+  * paymentBlock : boolean
+  * status : string <<FK → PaymentRequestStatuses.code>> = Created
+  --
+  originDocumentId : UUID <<FK → Documents.id, optional>>
+  --
+  * eventId : UUID <<integration>>
+  * sourceLineItemId : string <<integration, unique>>
+  * sourceLineItemReference : string <<integration>>
+}
+
+entity "numberFiPosition\nНомер FI-позиции" as FiPositionNumber {
+  * paymentRequestId : UUID <<PK, FK → PaymentRequest.id>>
+  --
+  * companyCode : string <<BUKRS, FK → CompanyCodes.code>>
+  * sourceDocumentId : UUID <<FK → Documents.id>>
+  * fiscalYear : string <<GJAHR>>
+  * positionNumber : string
+  * lineItemID : string <<canonical>>
+}
+
+entity "Documents\nДокументы" as Documents {
+  * id : UUID <<PK>>
+  --
+  * companyCode : string <<BUKRS, FK → CompanyCodes.code>>
+  * documentType : string <<FK → DocumentTypes.code>>
+  * documentNumber : string
+  * documentData : date
+}
+
+entity "Company Codes\nКоды компаний (BUKRS)" as CompanyCodes {
+  * code : string <<PK, BUKRS>>
+}
+
+entity "Document Types\nТипы документов" as DocumentTypes {
+  * code : string <<PK>>
+}
+
+entity "Counterparties\nКонтрагенты" as Counterparties {
+  * id : string <<PK>>
+  * name : string
+  * inn : string
+  kpp : string <<optional>>
+}
+
+entity "Payment Methods\nСпособы оплаты" as PaymentMethods {
+  * code : string <<PK>>
+}
+
+entity "Payment Request Statuses\nСтатусы заявки" as PaymentRequestStatuses {
+  * code : string <<PK>>
+  * name : string
+}
+
+PaymentRequest ||--|| FiPositionNumber : numberFiPosition
+Documents |o--o{ PaymentRequest : originDocument
+Documents ||--o{ FiPositionNumber : sourceDocument
+CompanyCodes ||--o{ FiPositionNumber : companyCode
+CompanyCodes ||--o{ Documents : companyCode
+DocumentTypes ||--o{ Documents : documentType
+Counterparties ||--o{ PaymentRequest : counterpartyId
+PaymentMethods ||--o{ PaymentRequest : paymentMethod
+PaymentRequestStatuses ||--o{ PaymentRequest : status
+
+note right of PaymentRequest
+  originDocumentId — необязательная ссылка
+  на документ-основание.
+  Она не заполняется
+  для прямой FI-проводки.
+end note
+
+note right of FiPositionNumber
+  Отдельная таблица.
+  paymentRequestId — общий первичный ключ
+  и внешний ключ на Payment Request.
+
+  lineItemID формируется по правилу:
+  FI_POSITION|BUKRS=<companyCode>|BLART=<Documents.documentType>|
+  DOCNO=<Documents.documentNumber>|DOCDATA=<Documents.documentData>|
+  GJAHR=<fiscalYear>|POSNO=<positionNumber>
+
+  Пример:
+  FI_POSITION|BUKRS=1000|BLART=KR|DOCNO=1900012345|
+  DOCDATA=2026-08-12|GJAHR=2026|POSNO=001
+end note
+
+note bottom of PaymentRequest
+  При создании из payment.demand
+  статус устанавливается в Created.
+  sourceLineItemId используется для трассировки
+  и идентификации исходной FI-AP позиции.
+end note
+@enduml
