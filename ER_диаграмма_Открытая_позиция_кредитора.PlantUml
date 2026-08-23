@@ -5,8 +5,9 @@ hide circle
 skinparam linetype ortho
 
 entity "Open Vendor Item (FI-AP)\nОткрытая позиция кредитора" as OpenVendorItem {
-  * sourceLineItemId : string <<PK>>
+  * id : UUID <<PK>>
   --
+  * sourceLineItemId : string
   * documentType : string = VENDOR_OPEN_ITEM
   * companyCode : string <<BUKRS>>
   * fiscalYear : string <<GJAHR>>
@@ -14,6 +15,8 @@ entity "Open Vendor Item (FI-AP)\nОткрытая позиция кредито
   * accountingDocumentNumber : string
   * lineItemID : string
   * sourceLineItemReference : string
+  --
+  originDocumentId : UUID <<FK → OriginDocument.id, optional>>
   --
   * counterpartyId : string
   * counterpartyRole : string = VENDOR
@@ -25,22 +28,16 @@ entity "Open Vendor Item (FI-AP)\nОткрытая позиция кредито
   * paymentBlock : boolean
 }
 
-entity "numberFiPosition\nНомер FI-позиции" as FiPositionNumber {
-  * companyCode : string <<BUKRS>>
-  * documentType : string <<BLART>>
-  * fiscalYear : string <<GJAHR>>
-  * positionNumber : string
-}
-
 entity "originDocument\nДокумент-основание" as OriginDocument {
+  * id : UUID <<PK>>
+  --
   * companyCode : string <<BUKRS>>
   * documentType : string
   * documentNumber : string
   * documentData : date
 }
 
-OpenVendorItem ||--|| FiPositionNumber : numberFiPosition
-OpenVendorItem ||--o| OriginDocument : originDocument
+OriginDocument |o--o{ OpenVendorItem : originDocument
 
 note bottom of OpenVendorItem
   sourceLineItemId совпадает с Kafka key.
