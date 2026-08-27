@@ -14,7 +14,7 @@ entity "Payment Request (TRM)\nЗаявка на оплату" as PaymentRequest
   * paymentPurpose : string
   * paymentMethod : string <<FK → PaymentMethods.code>>
   * paymentBlock : boolean
-  * status : string <<FK → PaymentRequestStatuses.code>> = Created
+  * status : string <<FK → PaymentRequestStatuses.code>>
   --
   originDocumentId : UUID <<FK → Documents.id, optional>>
   --
@@ -23,7 +23,7 @@ entity "Payment Request (TRM)\nЗаявка на оплату" as PaymentRequest
   * sourceLineItemReference : string <<integration>>
 }
 
-entity "numberFiPosition\nНомер FI-позиции" as FiPositionNumber {
+entity "numberFiPosition\nНомер FI-позиции" as numberFiPosition {
   * paymentRequestId : UUID <<PK, FK → PaymentRequest.id>>
   --
   * companyCode : string <<BUKRS, FK → CompanyCodes.code>>
@@ -66,10 +66,10 @@ entity "Payment Request Statuses\nСтатусы заявки" as PaymentRequest
   * name : string
 }
 
-PaymentRequest ||--|| FiPositionNumber : numberFiPosition
+PaymentRequest ||--|| numberFiPosition : numberFiPosition
 Documents |o--o{ PaymentRequest : originDocument
-Documents ||--o{ FiPositionNumber : sourceDocument
-CompanyCodes ||--o{ FiPositionNumber : companyCode
+Documents ||--o{ numberFiPosition : sourceDocument
+CompanyCodes ||--o{ numberFiPosition : companyCode
 CompanyCodes ||--o{ Documents : companyCode
 DocumentTypes ||--o{ Documents : documentType
 Counterparties ||--o{ PaymentRequest : counterpartyId
@@ -83,7 +83,7 @@ note right of PaymentRequest
   для прямой FI-проводки.
 end note
 
-note right of FiPositionNumber
+note right of numberFiPosition
   Отдельная таблица.
   paymentRequestId — общий первичный ключ
   и внешний ключ на Payment Request.
@@ -99,8 +99,9 @@ note right of FiPositionNumber
 end note
 
 note bottom of PaymentRequest
-  При создании из payment.demand
-  статус устанавливается в Created.
+  Статус определяется по значению
+  статуса источника через справочник
+  PaymentRequestStatuses.
   sourceLineItemId используется для трассировки
   и идентификации исходной FI-AP позиции.
 end note

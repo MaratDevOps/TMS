@@ -12,13 +12,27 @@
 | Сумма (`Amount`) | `amount` | Сумма (`Amount`) | `amount` | Значение `amount` передаётся без преобразования; сумма должна быть больше нуля. |
 | Валюта (`Currency`) | `currency` | Валюта (`Currency`) | `currency` | Код валюты ISO 4217 передаётся без преобразования. |
 | Срок оплаты (`Due date`) | `dueDate` | Срок оплаты (`Due date`) | `dueDate` | Рассчитанная в FI дата оплаты передаётся без преобразования. |
-| Код компании (`BUKRS`) | `companyCode` | Код компании (`BUKRS`) | `companyCode` | Передаётся внутрикорпоративный код компании. |
-| Документ-основание (`Origin document`) | `originDocument` | Документ-основание (`Origin document`) | `originDocument` | Передаётся структура: `companyCode` — код компании (`BUKRS`), `documentType` — тип документа, `documentNumber` — номер документа и `documentData` — дата документа в формате `YYYY-MM-DD`. |
-| Назначение платежа (`reference`)  | `paymentPurpose` | Назначение платежа (`reference`) | `paymentPurpose` | Строковое значение передаётся без преобразования. |
-| Статус (`Status`) | `status` | Статус (`Status`) | `status` | При создании заявки TRM устанавливает значение `Created`; изменения после создания должны передаваться отдельным событием `payment.status`. |
-| Номер FI-позиции (`number FI position`) | `numberFiPosition` | Номер FI-позиции (`number FI position`) | `numberFiPosition` | Передаётся структурой: `companyCode` (`BUKRS`), `documentType` (`BLART`), `documentNumber`, `documentData`, `fiscalYear` (`GJAHR`) и `positionNumber` (номер FI-позиции). |
-| Тип платежа (`Payment method`) | `paymentMethod` | Тип платежа (`Payment method`) | `paymentMethod` | Код способа платежа определяется по единому классификатору типов платежа. |
+| Код компании (`BUKRS`) | `companyCode` | Номер FI-позиции: код компании (`BUKRS`) | `numberFiPosition.companyCode` | Передаётся без преобразования в реквизит кода компании таблицы `numberFiPosition`. |
+| Финансовый год (`GJAHR`) | `fiscalYear` | Номер FI-позиции: финансовый год (`GJAHR`) | `numberFiPosition.fiscalYear` | Передаётся без преобразования в реквизит финансового года таблицы `numberFiPosition`. |
+| Группа реквизитов документа источника | `companyCode`, `documentType`, `documentNumber`, `documentData` | Документы: исходный документ | `numberFiPosition.sourceDocumentId → Documents.id` | TRM формирует структуру исходного документа из реквизитов `OpenVendorItem`. `documentType` имеет значение `VENDOR_OPEN_ITEM`. Ключ поиска или создания `Documents`: `companyCode` + `documentType` + `documentNumber` + `documentData`. Найденный или созданный внутренний `id` сохраняется в `numberFiPosition.sourceDocumentId`. |
+| Документ-основание (`Origin document`) | `originDocumentId → OriginDocument.id` | Документы: документ-основание | `PaymentRequest.originDocumentId → Documents.id` | Данные `companyCode`, `documentType`, `documentNumber` и `documentData` берутся из отдельной таблицы `OriginDocument` по `originDocumentId`. Ключ поиска или создания `Documents`: `companyCode` + `documentType` + `documentNumber` + `documentData`. Найденный или созданный внутренний `id` сохраняется в `PaymentRequest.originDocumentId`. Для прямой FI-проводки документ не передаётся, а `originDocumentId` не заполняется. |
+| Назначение платежа (`paymentPurpose`) | `paymentPurpose` | Назначение платежа (`paymentPurpose`) | `paymentPurpose` | Строковое значение передаётся без преобразования. |
+| Статус (`Status`) | `status` | Статус (`Status`) | `PaymentRequest.status → PaymentRequestStatuses.code` | По строковому значению `status` TRM ищет запись в справочнике `PaymentRequestStatuses` и сохраняет в заявке ссылку на найденную запись. |
+| Номер FI-позиции | `positionNumber` | Номер FI-позиции: номер строки | `numberFiPosition.positionNumber` | Передаётся без преобразования в реквизит номера позиции таблицы `numberFiPosition`. |
+| Идентификатор FI-позиции (`lineItemID`) | `lineItemID` | Номер FI-позиции: канонический идентификатор | `numberFiPosition.lineItemID` | `lineItemID` и сопутствующие реквизиты `companyCode`, `fiscalYear`, `positionNumber` передаются в составе структуры `numberFiPosition`. Ссылка `sourceDocumentId` присваивается TRM после обработки исходного FI-документа. На этой основе создаётся строка `numberFiPosition`; `paymentRequestId` присваивается при создании заявки. |
+| Тип платежа (`Payment method`) | `paymentMethod` | Тип платежа (`Payment method`) | `PaymentRequest.paymentMethod → PaymentMethods.code` | По строковому значению `paymentMethod` TRM ищет запись в справочнике `PaymentMethods` и сохраняет в заявке ссылку на найденную запись. |
 | Блокировка платежа (`Payment block`) | `paymentBlock` | Блокировка платежа (`Payment block`) | `paymentBlock` | Логический признак: `true` — платёж заблокирован, `false` — блокировка отсутствует. |
+
+## 2. Технические реквизиты Kafka
+
+Реквизиты этого раздела не входят в бизнес-маппинг заявки. Они передаются в Kafka-событии
+и сохраняются в TRM для трассировки и идемпотентной обработки.
+
+| Реквизит Kafka-события | Техническое наименование в FI-AP / Kafka | Реквизит TRM | Техническое наименование в TRM | Правило обработки |
+|---|---|---|---|---|
+| Идентификатор события | `eventId` | Идентификатор события | `PaymentRequest.eventId` | Передаётся и сохраняется без преобразования; используется для дедупликации сообщения. |
+| Идентификатор исходной FI-позиции | `sourceLineItemId` | Идентификатор исходной FI-позиции | `PaymentRequest.sourceLineItemId` | Передаётся и сохраняется без преобразования; используется для трассировки заявки к источнику. |
+| Техническая ссылка на исходную FI-позицию | `sourceLineItemReference` | Техническая ссылка на исходную FI-позицию | `PaymentRequest.sourceLineItemReference` | Передаётся и сохраняется без преобразования; используется для открытия позиции в системе-источнике. |
 
 
 

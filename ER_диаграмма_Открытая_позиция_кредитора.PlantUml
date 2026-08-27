@@ -11,8 +11,9 @@ entity "Open Vendor Item (FI-AP)\nОткрытая позиция кредито
   * documentType : string = VENDOR_OPEN_ITEM
   * companyCode : string <<BUKRS>>
   * fiscalYear : string <<GJAHR>>
-  * accountingDocumentType : string <<BLART>>
-  * accountingDocumentNumber : string
+  * documentNumber : string
+  * documentData : date
+  * positionNumber : string
   * lineItemID : string
   * sourceLineItemReference : string
   --
@@ -26,6 +27,7 @@ entity "Open Vendor Item (FI-AP)\nОткрытая позиция кредито
   * paymentPurpose : string
   * paymentMethod : string
   * paymentBlock : boolean
+  * status : string
 }
 
 entity "originDocument\nДокумент-основание" as OriginDocument {
