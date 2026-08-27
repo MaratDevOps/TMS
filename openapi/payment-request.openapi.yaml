@@ -1,12 +1,12 @@
 openapi: 3.0.3
 info:
   title: TRM Payment Request API
-  version: 1.0.0
+  version: 1.0.1
   description: |
     API для создания и получения заявок на оплату в Treasury Risk Management (TRM).
     Одна заявка создаётся для одной открытой позиции кредитора FI-AP.
     Изменения статуса, блокировки и отмена после создания синхронизируются
-    отдельным событием `payment.status`.
+    отдельным событием `payment.status`!
 servers:
   - url: /api/v1
     description: Базовый URL TRM API
