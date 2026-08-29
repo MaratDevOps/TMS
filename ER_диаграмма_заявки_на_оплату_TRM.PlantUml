@@ -40,6 +40,7 @@ entity "Documents\nДокументы" as Documents {
   * documentType : string <<FK → DocumentTypes.code>>
   * documentNumber : string
   * documentData : date
+  * documentKey : string <<canonical, unique>>
 }
 
 entity "Company Codes\nКоды компаний (BUKRS)" as CompanyCodes {
@@ -89,12 +90,12 @@ note right of numberFiPosition
   и внешний ключ на Payment Request.
 
   lineItemID формируется по правилу:
-  FI_POSITION|BUKRS=<companyCode>|BLART=<Documents.documentType>|
+  FI_POSITION|BUKRS=<companyCode>|DOCTYPE=<Documents.documentType>|
   DOCNO=<Documents.documentNumber>|DOCDATA=<Documents.documentData>|
   GJAHR=<fiscalYear>|POSNO=<positionNumber>
 
   Пример:
-  FI_POSITION|BUKRS=1000|BLART=KR|DOCNO=1900012345|
+  FI_POSITION|BUKRS=1000|DOCTYPE=VENDOR_OPEN_ITEM|DOCNO=1900012345|
   DOCDATA=2026-08-12|GJAHR=2026|POSNO=001
 end note
 
