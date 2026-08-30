@@ -1,0 +1,95 @@
+@startuml FI_AP_Service_ER
+title Микросервис FI-AP\nER-диаграмма
+
+hide circle
+skinparam linetype ortho
+
+entity "Origin Document\nДокумент-основание" as OriginDocument {
+  * id : UUID <<PK>>
+  --
+  * companyCode : string
+  * documentType : string
+  * documentNumber : string
+  * documentData : date
+}
+
+entity "Open Vendor Item\nОткрытая позиция кредитора" as OpenVendorItem {
+  * id : UUID <<PK>>
+  --
+  * sourceLineItemId : string <<unique>>
+  * documentType : string = VENDOR_OPEN_ITEM
+  * companyCode : string
+  * fiscalYear : string
+  * documentNumber : string
+  * documentData : date
+  * positionNumber : string
+  * lineItemID : string <<canonical, unique>>
+  * sourceLineItemReference : string
+  originDocumentId : UUID <<FK → OriginDocument.id, optional>>
+  --
+  * counterpartyId : string
+  * counterpartyRole : string = VENDOR
+  * amount : decimal > 0
+  * currency : string
+  * dueDate : date
+  * paymentPurpose : string
+  * paymentMethod : string
+  * paymentBlock : boolean
+  * status : string
+}
+
+entity "Outbox" as Outbox {
+  * eventId : UUID <<PK>>
+  --
+  * aggregateId : UUID <<FK → OpenVendorItem.id>>
+  * aggregateType : string = VENDOR_OPEN_ITEM
+  * eventType : string = payment.demand
+  * eventVersion : string
+  * topic : string = payment.demand
+  * messageKey : string
+  * payload : JSON
+  * occurredAt : datetime
+  * createdAt : datetime
+}
+
+entity "Outbox Delivery Attempts\nПопытки доставки Outbox" as OutboxDeliveryAttempts {
+  * id : UUID <<PK>>
+  --
+  * eventId : UUID <<FK → Outbox.eventId>>
+  * attemptNumber : integer
+  * status : string
+  * startedAt : datetime
+  finishedAt : datetime <<optional>>
+  nextAttemptAt : datetime <<optional>>
+  * publisherInstance : string
+  * lockedUntil : datetime
+  partition : integer <<optional>>
+  offset : long <<optional>>
+  errorMessage : string <<optional>>
+}
+
+OriginDocument |o--o{ OpenVendorItem : originDocument
+OpenVendorItem ||--|{ Outbox : events
+Outbox ||--o{ OutboxDeliveryAttempts : deliveryAttempts
+
+note right of Outbox
+  Запись создаётся в одной транзакции
+  с созданием или изменением OpenVendorItem.
+
+  После создания запись не изменяется.
+  messageKey равен sourceLineItemId.
+end note
+
+note right of OutboxDeliveryAttempts
+  Допустимые статусы:
+  PROCESSING
+  PUBLISHED
+  FAILED
+  INTERRUPTED
+
+  Пара eventId + attemptNumber уникальна.
+  Текущее состояние доставки определяется
+  по последней попытке события.
+end note
+
+@enduml
