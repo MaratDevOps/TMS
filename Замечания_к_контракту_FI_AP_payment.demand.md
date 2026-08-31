@@ -13,7 +13,7 @@
 Не перечислены обязательные:
 
 - `eventType`, `eventVersion`;
-- `occurredAt`, `publishedAt`;
+- `occurredAt`;
 - `producerSystem`;
 - `documentType`;
 - `sourceLineItemReference`;

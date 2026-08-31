@@ -49,7 +49,6 @@ BUKRS=<COMPANY_CODE>|GJAHR=<FISCAL_YEAR>
 | `eventType` | string | Да | Фиксированное значение `payment.demand`. |
 | `eventVersion` | string | Да | Версия контракта, например `1.0`. |
 | `occurredAt` | datetime | Да | Время возникновения FI-AP позиции. |
-| `publishedAt` | datetime | Да | Время публикации записи Outbox. |
 | `producerSystem` | string | Да | Идентификатор SAP FI / Publisher. |
 
 ### 3.2. Источник — открытая позиция кредитора
@@ -188,7 +187,6 @@ TRM создаёт её, генерирует внутренний UUID `Documen
   "eventType": "payment.demand",
   "eventVersion": "1.0",
   "occurredAt": "2026-08-12T10:15:00Z",
-  "publishedAt": "2026-08-12T10:15:02Z",
   "producerSystem": "SAP_FI",
   "documentType": "VENDOR_OPEN_ITEM",
   "numberFiPosition": {
