@@ -1,0 +1,149 @@
+@startuml FI_AP_PostgreSQL_Physical_Model
+title FI-AP\nФизическая модель PostgreSQL
+
+hide circle
+skinparam linetype ortho
+
+entity "origin_documents\nДокументы-основания" as origin_documents <<table>> {
+  * id : uuid <<PK>>
+  --
+  * company_code : varchar(7)
+  * document_type : varchar(30)
+  * document_number : varchar(20)
+  * document_data : date
+}
+
+entity "open_vendor_items\nОткрытые позиции кредиторов" as open_vendor_items <<table>> {
+  * id : uuid <<PK>>
+  --
+  * source_line_item_id : varchar(512) <<UQ>>
+  * document_type : varchar(30) = 'VENDOR_OPEN_ITEM'
+  * company_code : varchar(7)
+  * fiscal_year : char(4)
+  * document_number : varchar(20)
+  * document_data : date
+  * position_number : varchar(3)
+  * line_item_id : varchar(512) <<UQ>>
+  * source_line_item_reference : varchar(1024)
+  origin_document_id : uuid <<FK → origin_documents.id, NULL>>
+  --
+  * counterparty_id : varchar(64)
+  * counterparty_role : varchar(20) = 'VENDOR'
+  * amount : numeric(19,2)
+  * currency : char(3)
+  * due_date : date
+  * payment_purpose : varchar(500)
+  * payment_method : varchar(50)
+  * payment_block : boolean = false
+  * status : varchar(50)
+}
+
+entity "outbox\nСобытия для публикации" as outbox <<table>> {
+  * event_id : uuid <<PK>>
+  --
+  * aggregate_id : uuid <<FK → open_vendor_items.id>>
+  * aggregate_type : varchar(50) = 'VENDOR_OPEN_ITEM'
+  * event_type : varchar(100) = 'payment.demand'
+  * event_version : varchar(20)
+  * topic : varchar(249) = 'payment.demand'
+  * message_key : varchar(512)
+  * payload : jsonb
+  * occurred_at : timestamptz
+  * created_at : timestamptz = now()
+}
+
+entity "outbox_delivery_attempts\nПопытки доставки Outbox" as outbox_delivery_attempts <<table>> {
+  * id : uuid <<PK>>
+  --
+  * event_id : uuid <<FK → outbox.event_id>>
+  * attempt_number : integer
+  * status : varchar(20)
+  * started_at : timestamptz
+  finished_at : timestamptz <<NULL>>
+  next_attempt_at : timestamptz <<NULL>>
+  * publisher_instance : varchar(255)
+  * locked_until : timestamptz
+  partition : integer <<NULL>>
+  offset_value : bigint <<NULL>>
+  error_message : text <<NULL>>
+}
+
+entity "fi_document_number_seq" as fi_document_number_seq <<sequence>> {
+  * data_type : bigint
+  * start_value : 1900010000
+  * increment_by : 1
+}
+
+origin_documents |o--o{ open_vendor_items : origin_document_id
+open_vendor_items ||--|{ outbox : aggregate_id
+outbox ||--o{ outbox_delivery_attempts : event_id
+fi_document_number_seq ..> open_vendor_items : document_number
+
+note right of origin_documents
+  UQ uq_origin_documents_business_key:
+  (company_code, document_type,
+   document_number, document_data)
+end note
+
+note bottom of open_vendor_items
+  UQ uq_open_vendor_items_source_line_item_id:
+  (source_line_item_id)
+
+  UQ uq_open_vendor_items_line_item_id:
+  (line_item_id)
+
+  UQ uq_open_vendor_items_fi_position:
+  (company_code, fiscal_year,
+   document_number, position_number)
+
+  CHECK document_type = 'VENDOR_OPEN_ITEM'
+  CHECK counterparty_role = 'VENDOR'
+  CHECK amount > 0
+  CHECK due_date >= document_data
+
+  INDEX ix_open_vendor_items_origin_document_id:
+  (origin_document_id)
+end note
+
+note right of outbox
+  FK aggregate_id ON DELETE RESTRICT.
+  Запись после создания не изменяется.
+
+  INDEX ix_outbox_aggregate_id:
+  (aggregate_id)
+
+  INDEX ix_outbox_created_at:
+  (created_at, event_id)
+end note
+
+note bottom of outbox_delivery_attempts
+  UQ uq_outbox_attempt_event_number:
+  (event_id, attempt_number)
+
+  CHECK attempt_number > 0
+  CHECK status IN
+  ('PROCESSING', 'PUBLISHED',
+   'FAILED', 'INTERRUPTED')
+  CHECK partition IS NULL OR partition >= 0
+  CHECK offset_value IS NULL OR offset_value >= 0
+
+  FK event_id ON DELETE RESTRICT.
+
+  INDEX ix_outbox_attempt_event_latest:
+  (event_id, attempt_number DESC)
+
+  INDEX ix_outbox_attempt_retry:
+  (status, next_attempt_at, locked_until)
+end note
+
+note bottom of fi_document_number_seq
+  document_number хранится как строка,
+  чтобы сохранять ведущие нули.
+  Значение получается через nextval()
+  и форматируется:
+  lpad(nextval(...)::text, 10, '0')
+
+  Пропуски после rollback допустимы.
+end note
+
+@enduml
