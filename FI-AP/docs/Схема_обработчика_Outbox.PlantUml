@@ -1,0 +1,78 @@
+@startuml FI_AP_Outbox_Publisher
+title FI-AP\nАлгоритм обработчика Outbox
+
+skinparam linetype ortho
+
+start
+:Загрузить и проверить\noutboxPublisher;
+:Проверить PostgreSQL и Kafka;
+:Сформировать publisherInstance;
+:Запустить workers;
+
+repeat
+  :Рассчитать claimLimit;
+
+  partition "Транзакция захвата PostgreSQL" {
+    :Выбрать события по\ncreated_at, event_id;
+    note right
+      FOR UPDATE OF outbox
+      SKIP LOCKED
+      LIMIT claimLimit
+    end note
+
+    if (Есть зависшая\nPROCESSING?) then (да)
+      :Перевести попытку\nв INTERRUPTED;
+    endif
+
+    if (Лимит попыток\nне исчерпан?) then (да)
+      :Создать новую попытку;
+      note right
+        status = PROCESSING
+        started_at = now()
+        locked_until =
+          now() + lockTimeout
+      end note
+    endif
+
+    :COMMIT;
+  }
+
+  if (Созданы попытки?) then (нет)
+    :Ждать pollInterval;
+  else (да)
+    :Передать события\nсвободным workers;
+
+    fork
+      :Отправить событие в Kafka\nс kafkaSendTimeout;
+
+      if (Kafka подтвердила\nпубликацию?) then (да)
+        partition "Фиксация результата PostgreSQL" {
+          :status = PUBLISHED;
+          :Записать finished_at,\npartition, offset_value;
+        }
+      else (нет)
+        partition "Фиксация результата PostgreSQL" {
+          :status = FAILED;
+          :Записать finished_at\nи error_message;
+
+          if (Ошибка допускает повтор\nи attemptNumber < maxAttempts?) then (да)
+            :Рассчитать задержку\nс exponential backoff и jitter;
+            :Записать next_attempt_at;
+          else (нет)
+            :next_attempt_at = NULL;
+          endif
+        }
+      endif
+    fork again
+      :Остальные workers публикуют\nдругие messageKey;
+    end fork
+  endif
+
+repeat while (Получен сигнал\nзавершения?) is (нет)
+
+:Прекратить новые захваты;
+:Дождаться активных workers\nне дольше shutdownTimeout;
+:Отменить оставшиеся Kafka-запросы;
+stop
+
+@enduml
