@@ -1,0 +1,32 @@
+@startuml FI_AP_Open_Vendor_Item_Generation
+title FI-AP\nПараллельная генерация открытых позиций кредиторов
+
+skinparam linetype ortho
+
+start
+:Загрузить и проверить сценарий;
+:Проверить PostgreSQL и Kafka;
+:Запустить обработчик Outbox;
+:Рассчитать documentCount;
+:Получить номера документов через\nnextval('fi_document_number_seq');
+:Сформировать диапазон 1..positionCount;
+:Назначить каждому заданию\ndocumentNumber и positionNumber;
+:Создать пул parallelThreads;
+
+fork
+  repeat
+    :Получить следующий номер;
+    :Сгенерировать OpenVendorItem;
+    :Сформировать payment.demand;
+    :Сохранить OpenVendorItem и Outbox\nв одной транзакции;
+  repeat while (Остались номера?) is (да)
+fork again
+  :Остальные потоки выполняют\nтот же алгоритм;
+end fork
+
+:Дождаться завершения всех потоков;
+:Дождаться результата публикации\nсобытий текущего запуска;
+:Сформировать результат запуска;
+stop
+
+@enduml
