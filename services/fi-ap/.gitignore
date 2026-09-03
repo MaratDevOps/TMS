@@ -1,0 +1,5 @@
+*.exe
+*.test
+*.out
+/fi-ap-generator
+/fi-ap-generator.exe

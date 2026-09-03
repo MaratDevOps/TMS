@@ -1,0 +1,39 @@
+{
+  "eventId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+  "eventType": "payment.demand",
+  "eventVersion": "1.0",
+  "occurredAt": "2026-08-12T10:15:00Z",
+  "producerSystem": "SAP_FI",
+  "documentType": "VENDOR_OPEN_ITEM",
+  "numberFiPosition": {
+    "companyCode": "1000",
+    "fiscalYear": "2026",
+    "positionNumber": "001",
+    "lineItemID": "FI_POSITION|BUKRS=1000|DOCTYPE=VENDOR_OPEN_ITEM|DOCNO=1900012345|DOCDATA=2026-08-12|GJAHR=2026|POSNO=001",
+    "sourceDocument": {
+      "companyCode": "1000",
+      "documentType": "VENDOR_OPEN_ITEM",
+      "documentNumber": "1900012345",
+      "documentData": "2026-08-12",
+      "documentKey": "DOCUMENT|BUKRS=1000|DOCTYPE=VENDOR_OPEN_ITEM|DOCNO=1900012345|DOCDATA=2026-08-12"
+    }
+  },
+  "sourceLineItemId": "FI|role=VENDOR|CP=0001007788|DOCTYPE=VENDOR_OPEN_ITEM|DOCNO=1900012345-001|BUKRS=1000|GJAHR=2026",
+  "sourceLineItemReference": "fi-ap://open-vendor-items/4eb35ed1-3422-4ed4-b1f8-d405ea2838cb",
+  "originDocument": {
+    "companyCode": "1000",
+    "documentType": "MIRO",
+    "documentNumber": "5100001234",
+    "documentData": "2026-08-12",
+    "documentKey": "DOCUMENT|BUKRS=1000|DOCTYPE=MIRO|DOCNO=5100001234|DOCDATA=2026-08-12"
+  },
+  "counterpartyId": "0001007788",
+  "counterpartyRole": "VENDOR",
+  "amount": 125000.00,
+  "currency": "RUB",
+  "dueDate": "2026-08-20",
+  "paymentPurpose": "Оплата по счёту поставщика",
+  "paymentMethod": "BANK_TRANSFER",
+  "paymentBlock": false,
+  "status": "CREATED"
+}
