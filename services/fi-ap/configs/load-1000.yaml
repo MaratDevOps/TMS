@@ -1,0 +1,61 @@
+# 1000 позиций, 5 параллельных потоков генерации.
+#
+# Запуск:
+#   go run ./cmd/fi-ap-generator --config configs/load-1000.yaml --scenario load-1000
+
+postgres:
+  dsn: "postgres://fiap:fiap@localhost:5432/fiap?sslmode=disable"
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  topic: "payment.demand"
+  producerSystem: "SAP_FI"
+
+metrics:
+  listen: ":9090"
+
+generation:
+  activeScenario: load-1000
+
+  referenceData:
+    companyCodes: ["1000"]
+    counterpartyIds: ["0001007788"]
+    currencies: ["RUB"]
+    paymentMethods: ["BANK_TRANSFER"]
+    statuses: ["CREATED"]
+    originDocumentTypes: ["MIRO"]
+
+  scenarios:
+    load-1000:
+      positionCount: 1000
+      parallelThreads: 5
+      randomSeed: 3001
+      positionsPerDocument: 10
+      baseDocumentDate: 2026-01-01
+      originDocumentShare: 1.0
+      amount:
+        min: "100.00"
+        max: "1000000.00"
+      dueDays:
+        min: 1
+        max: 30
+      paymentBlockProbability: 0.05
+      paymentPurposeTemplate: "Оплата по FI-позиции %s"
+      stopOnError: false
+
+outboxPublisher:
+  enabled: true
+  workers: 5
+  batchSize: 100
+  pollInterval: 200ms
+  claimTransactionTimeout: 5s
+  lockTimeout: 30s
+  kafkaSendTimeout: 10s
+  maxAttempts: 5
+  retry:
+    initialInterval: 500ms
+    multiplier: 2.0
+    maxInterval: 30s
+    jitter: 0.20
+  shutdownTimeout: 60s
